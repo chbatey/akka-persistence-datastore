@@ -1,0 +1,16 @@
+indexes:
+# Used for recovery
+- kind: Event
+  properties:
+  - name: persistenceId
+    direction: asc
+  - name: sequenceNr
+    direction: asc
+
+# Used for highest sequence number query
+- kind: Event
+  properties:
+  - name: persistenceId
+    direction: asc
+  - name: sequenceNr
+    direction: desc
