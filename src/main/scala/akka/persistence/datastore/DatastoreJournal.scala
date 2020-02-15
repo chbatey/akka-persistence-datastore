@@ -9,7 +9,7 @@ import com.spotify.asyncdatastoreclient.QueryBuilder.{asc, desc, eq => dsEq}
 import com.spotify.asyncdatastoreclient._
 import com.typesafe.config.Config
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -32,21 +32,23 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
     // FIXME do these one at a time rather than all at once to preserve order
-    val batches: immutable.Seq[Batch] = messages.map { aw =>
-      val batch = new Batch
-      aw.payload.foreach { pr =>
-        val row =
-          QueryBuilder.insert("Event", s"${pr.persistenceId}-${pr.sequenceNr}")
-            .value("persistenceId", pr.persistenceId)
-            .value("sequenceNr", pr.sequenceNr)
-            // FIXME, do tags
-            .value("tags", List("red", "blue").asJava.asInstanceOf[java.util.List[AnyRef]])
-            // FIXME store payload, serialisation etc
-            .value("payload", pr.payload.toString)
-        batch.add(row)
+    val batches: Seq[Batch] = messages.groupBy(_.persistenceId).values.flatMap { messagesBatch =>
+      messagesBatch.map { aw => 
+        val batch = new Batch
+        aw.payload.foreach { pr =>
+          val row =
+            QueryBuilder.insert("Event", s"${pr.persistenceId}-${pr.sequenceNr}")
+              .value("persistenceId", pr.persistenceId)
+              .value("sequenceNr", pr.sequenceNr)
+              // FIXME, do tags
+                .value("tags", List("red", "blue").asJava.asInstanceOf[java.util.List[AnyRef]])
+                // FIXME store payload, serialisation etc
+                  .value("payload", pr.payload.toString)
+                  batch.add(row)
+        }
+        batch
       }
-      batch
-    }
+    }.toSeq
 
     val writes: immutable.Seq[Future[Try[Unit]]] = batches.map { b =>
       datastore.executeAsync(b).asScala.map(_ => Success(())).recover { case t => Failure(t) }
