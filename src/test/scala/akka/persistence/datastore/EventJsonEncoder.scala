@@ -7,7 +7,7 @@ import play.api.libs.functional.syntax._
 
 import scala.reflect.runtime.universe._
 
-class EventJsonEncoder extends JsonEncoder[MyPersistentBehavior.Event] {
+class EventJsonEncoder extends EventEncoder[MyPersistentBehavior.Event] {
 
 
     def parse(typeValue: String, obj: JsValue) = typeValue match {
@@ -19,18 +19,18 @@ class EventJsonEncoder extends JsonEncoder[MyPersistentBehavior.Event] {
       (JsPath \ "value").read[Int].map(MyPersistentBehavior.Incremented.apply _)
     
 
-    override def fromJson: PartialFunction[String, MyPersistentBehavior.Event] = { json =>
+    override def deserialize: PartialFunction[String, MyPersistentBehavior.Event] = { json =>
       val jsonObj = Json.parse(json)
       (jsonObj \ "type").toEither.fold(
-        err => ???,
+        err => throw new RuntimeException("Error parsing event from journal"), 
         rawJsonField => rawJsonField.validate[String].fold(
-          err => ???,
+          err => throw new RuntimeException("Error cast type field in journal"),
           typeValue => parse(typeValue, jsonObj).get
         )
       )
     }
 
-    override def parseJson: PartialFunction[MyPersistentBehavior.Event,String] = {
+    override def serialize: PartialFunction[MyPersistentBehavior.Event,String] = {
       case Incremented(value) => Json.stringify(Json.obj(
         ("value", JsNumber(value)),
         ("type", JsString("incremented")),

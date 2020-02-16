@@ -2,33 +2,33 @@ package akka.persistence.datastore
 
 import scala.reflect.runtime.universe._
 
-trait JsonEncoder[T] {
+trait EventEncoder[T] {
 
 
   def cast(data: Any)(implicit typeTag: TypeTag[T]): T = data.asInstanceOf[T]
 
   
-  protected def parseJson: PartialFunction[T, String]
+  protected def serialize: PartialFunction[T, String]
 
   /**
     * A partial function that serializes an event to a json representation
     * @return the json representation
     */
-  def toJson(data: Any)(implicit typeTag: TypeTag[T]): String = parseJson(cast(data))
+  def castAndSerialize(data: Any)(implicit typeTag: TypeTag[T]): String = serialize(cast(data))
 
 
   /**
     * A partial function that deserializes an event from some json representation
     * @return the event
     */
-  def fromJson: PartialFunction[(String), T]
+  def deserialize: PartialFunction[(String), T]
 
 }
 
-object NoneJsonEncoder extends JsonEncoder[Any] {
+object NoneJsonEncoder extends EventEncoder[Any] {
 
-  override def parseJson: PartialFunction[Any,String] = PartialFunction.empty[Any, String]
+  override def serialize: PartialFunction[Any,String] = PartialFunction.empty[Any, String]
 
-  override def fromJson: PartialFunction[(String), Any] =
+  override def deserialize: PartialFunction[(String), Any] =
     PartialFunction.empty[(String), Any]
 }

@@ -22,7 +22,7 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
   private val settings = DataStoreSettings(config)
 
   val pluginConfig: PluginConfig = PluginConfig(config)
-  val eventEncoder: JsonEncoder[_] = pluginConfig.eventEncoder
+  val eventEncoder: EventEncoder[_] = pluginConfig.eventEncoder
 
   private val dsConfig = DatastoreConfig.builder.requestTimeout(1000)
     .requestRetry(3)
@@ -48,7 +48,7 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
               // FIXME, do tags
               // .value("tags", List("red", "blue").asJava.asInstanceOf[java.util.List[AnyRef]])
               // FIXME store payload, serialisation etc
-              .value("payload", eventEncoder.toJson(pr.payload))
+              .value("payload", eventEncoder.castAndSerialize(pr.payload))
           batch.add(row)
         }
         batch
@@ -78,7 +78,7 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
     datastore.executeAsync(query).asScala.map { result: QueryResult =>
       val rows = result.getAll
       rows.forEach { e =>
-        val pr = PersistentRepr(eventEncoder.fromJson(e.getString("payload")), e.getInteger("sequenceNr"), e.getString("persistenceId"))
+        val pr = PersistentRepr(eventEncoder.deserialize(e.getString("payload")), e.getInteger("sequenceNr"), e.getString("persistenceId"))
         recoveryCallback(pr)
       }
     }
