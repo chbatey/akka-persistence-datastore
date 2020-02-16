@@ -13,16 +13,21 @@ import scala.jdk.CollectionConverters._
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import play.api.libs.json.Json
+import play.api.libs.json.JsValue
 
 class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJournal {
 
-  println(configPath)
-
   //FIXME config
   private val settings = DataStoreSettings(config)
+
+  val pluginConfig: PluginConfig = PluginConfig(config)
+  val eventEncoder: JsonEncoder[_] = pluginConfig.eventEncoder
+
   private val dsConfig = DatastoreConfig.builder.requestTimeout(1000)
     .requestRetry(3)
     .project(settings.project)
+    // .host(settings.host)
     .credential(GoogleCredential.fromStream(new FileInputStream(new File(settings.credentialsFile)))
       .createScoped(DatastoreConfig.SCOPES)).build
 
@@ -41,10 +46,10 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
               .value("persistenceId", pr.persistenceId)
               .value("sequenceNr", pr.sequenceNr)
               // FIXME, do tags
-                .value("tags", List("red", "blue").asJava.asInstanceOf[java.util.List[AnyRef]])
-                // FIXME store payload, serialisation etc
-                  .value("payload", pr.payload.toString)
-                  batch.add(row)
+              // .value("tags", List("red", "blue").asJava.asInstanceOf[java.util.List[AnyRef]])
+              // FIXME store payload, serialisation etc
+              .value("payload", eventEncoder.toJson(pr.payload))
+          batch.add(row)
         }
         batch
       }
@@ -73,7 +78,7 @@ class DatastoreJournal(config: Config, configPath: String) extends AsyncWriteJou
     datastore.executeAsync(query).asScala.map { result: QueryResult =>
       val rows = result.getAll
       rows.forEach { e =>
-        val pr = PersistentRepr(e.getString("payload"), e.getInteger("sequenceNr"), e.getString("persistenceId"))
+        val pr = PersistentRepr(eventEncoder.fromJson(e.getString("payload")), e.getInteger("sequenceNr"), e.getString("persistenceId"))
         recoveryCallback(pr)
       }
     }

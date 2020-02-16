@@ -1,34 +1,19 @@
 package akka.persistence.datastore
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.typed.{ActorSystem, Props}
 import akka.persistence.PersistentActor
 import akka.persistence.query.PersistenceQuery
+import org.scalatest._
 
 import scala.io.StdIn
+import akka.persistence.datastore.MyPersistentBehavior.Increment
+import org.scalatest.flatspec.AnyFlatSpec
 
-class StupidActor(val persistenceId: String) extends PersistentActor {
-  override def receiveRecover: Receive = {
-    case msg => println("Recovered: " + msg)
+class ExampleApp extends AnyFlatSpec {
+
+  "" should "" in {
+    val behavior = MyPersistentBehavior.apply() 
+    val actor = ActorSystem.create(behavior, "test")
+    actor.ref.tell(Increment)
   }
-  override def receiveCommand: Receive = {
-    case cmd => persist(cmd.toString) { e =>
-      println("Persisted: " + e)
-    }
-  }
-}
-
-object ExampleApp extends App {
-  val system = ActorSystem()
-
-  val sa = system.actorOf(Props[StupidActor](new StupidActor("p102")))
-
-//  (1 to 100).foreach { i =>
-//    sa ! s"e-$i"
-//  }
-
-
-  val queries = PersistenceQuery(system).readJournalFor[DataStoreReadJournal](DataStoreReadJournal.Identifier)
-
-  StdIn.readLine()
-  system.terminate()
 }
